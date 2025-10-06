@@ -1,5 +1,3 @@
-
-
 import requests
 import json
 import os
@@ -9,10 +7,9 @@ APP_IDS = [
     "8485526434899813", # ug
     "4979055762136823", # gtag
     "7190422614401072", # Animal Company
-
 ]
 
-DISCORD_WEBHOOK = os.getenv('https://discord.com/api/webhooks/1424841892327194779/hq6Gv02IvTHm8x35fhHW6Z0fknKB2g4OJIa4dOIpPSYCgoDR9hHpILZHPFdIAs0cSL-M')
+DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1424841892327194779/hq6Gv02IvTHm8x35fhHW6Z0fknKB2g4OJIa4dOIpPSYCgoDR9hHpILZHPFdIAs0cSL-M"
 VERSIONS_FILE = 'versions.json'
 
 def load_versions():
