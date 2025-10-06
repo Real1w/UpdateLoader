@@ -12,7 +12,7 @@ APP_IDS = [
 
 ]
 
-DISCORD_WEBHOOK = os.getenv('DISCORD_WEBHOOK')
+DISCORD_WEBHOOK = os.getenv('https://discord.com/api/webhooks/1424841892327194779/hq6Gv02IvTHm8x35fhHW6Z0fknKB2g4OJIa4dOIpPSYCgoDR9hHpILZHPFdIAs0cSL-M')
 VERSIONS_FILE = 'versions.json'
 
 def load_versions():
