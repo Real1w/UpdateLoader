@@ -73,6 +73,8 @@ def send_discord_notification(app_id, app_name, old_version, new_version):
         print("No Discord webhook configured")
         return
     
+    print(f"Attempting to send Discord notification to: {DISCORD_WEBHOOK[:50]}...")
+    
     embed = {
         "embeds": [{
             "title": "Meta App Update Checker",
@@ -103,11 +105,17 @@ def send_discord_notification(app_id, app_name, old_version, new_version):
     }
     
     try:
+        print(f"Sending embed: {json.dumps(embed, indent=2)}")
         response = requests.post(DISCORD_WEBHOOK, json=embed, timeout=10)
+        print(f"Response status code: {response.status_code}")
+        print(f"Response text: {response.text}")
         response.raise_for_status()
-        print(f"Discord notification sent for {app_name}")
+        print(f"✅ Discord notification sent successfully for {app_name}")
     except Exception as e:
-        print(f"Error sending Discord notification: {str(e)}")
+        print(f"❌ Error sending Discord notification: {str(e)}")
+        print(f"Full error details: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
 
 def main():
     print("Starting Meta Quest update check...")
