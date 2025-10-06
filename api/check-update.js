@@ -1,123 +1,88 @@
+import fetch from "node-fetch";
 
+const WEBHOOK_URL = "https://discord.com/api/webhooks/1424841892327194779/hq6Gv02IvTHm8x35fhHW6Z0fknKB2g4OJIa4dOIpPSYCgoDR9hHpILZHPFdIAs0cSL-M";
+const APP_IDS = ["4979055762136823", "8485526434899813"];
+const GITHUB_REPO = "Real1w/UpdateLoader"; 
+const FILE_PATH = "data/lastVersions.json";
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  const { appId, webhookUrl } = req.body;
-
-  if (!appId) {
-    return res.status(400).json({ error: 'appId is required' });
-  }
-
-  if (!webhookUrl) {
-    return res.status(400).json({ error: 'webhookUrl is required' });
-  }
-
   try {
-    // Fetch app info from Meta/Oculus Graph API
-    const response = await fetch(
-      `https://graph.oculus.com/graphql?forced_locale=en_US&doc_id=5303836509676156&variables={"applicationID":"${appId}","hmdType":"HOLLYWOOD","firstStoreItems":1,"releaseChannels":["LIVE"]}`,
+    const fileRes = await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`,
       {
+        headers: { Authorization: `token ${GITHUB_TOKEN}` },
+      }
+    );
+    const fileData = await fileRes.json();
+    const oldContent = Buffer.from(fileData.content, "base64").toString("utf8");
+    let lastVersions = JSON.parse(oldContent || "{}");
+
+    let updates = [];
+
+    for (const appid of APP_IDS) {
+      const response = await fetch(
+        `https://graph.oculus.com/${appid}?fields=latest_supported_binary{id,version,change_log,created_date,version_code}&access_token=OC|200760620292815|`
+      );
+      const data = await response.json();
+
+      if (!data.latest_supported_binary) continue;
+      const binary = data.latest_supported_binary;
+      const version = binary.version;
+      const changelog = binary.change_log || "No changelog.";
+      const date = binary.created_date || "Unknown";
+
+      if (lastVersions[appid] !== version) {
+        updates.push({ appid, version, changelog, date });
+        lastVersions[appid] = version;
+
+        await fetch(WEBHOOK_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: "Meta Update Checker",
+            embeds: [
+              {
+                title: "🆕 Update Found",
+                color: 0x00ffcc,
+                fields: [
+                  { name: "App ID", value: appid, inline: true },
+                  { name: "Version", value: version, inline: true },
+                  { name: "Date", value: date, inline: true },
+                  {
+                    name: "Changelog",
+                    value: changelog.substring(0, 1024),
+                  },
+                ],
+                footer: { text: "From GitHub Persistent Checker" },
+                timestamp: new Date().toISOString(),
+              },
+            ],
+          }),
+        });
+      }
+    }
+
+    const updatedContent = Buffer.from(JSON.stringify(lastVersions, null, 2)).toString("base64");
+
+    await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`,
+      {
+        method: "PUT",
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
+          Authorization: `token ${GITHUB_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: "Update Meta app versions",
+          content: updatedContent,
+          sha: fileData.sha,
+        }),
       }
     );
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch app data from Meta API');
-    }
-
-    const data = await response.json();
-
-    const appData = data?.data?.node;
-    if (!appData) {
-      return res.status(404).json({ error: 'App not found' });
-    }
-
-    const appName = appData.displayName || 'Unknown App';
-    const versionCode = appData.primaryBinary?.version || 'Unknown';
-    const versionString = appData.primaryBinary?.versionString || 'Unknown';
-    const releaseDate = appData.primaryBinary?.created_date || Date.now() / 1000;
-    const fileSize = appData.primaryBinary?.size || 0;
-
-    const updateInfo = {
-      appId,
-      appName,
-      versionCode,
-      versionString,
-      releaseDate: new Date(releaseDate * 1000).toISOString(),
-      fileSize: (fileSize / 1024 / 1024 / 1024).toFixed(2) + ' GB'
-    };
-
-    const discordPayload = {
-      embeds: [{
-        title: 'Update Checker,
-        description: `**${appName}** has a got a new update`,
-        color: 5814783,
-        fields: [
-          {
-            name: 'App Name',
-            value: appName,
-            inline: true
-          },
-          {
-            name: 🆔App ID',
-            value: appId,
-            inline: true
-          },
-          {
-            name: 'Version',
-            value: versionString,
-            inline: true
-          },
-          {
-            name: 'Version Code',
-            value: versionCode.toString(),
-            inline: true
-          },
-          {
-            name: 'File Size',
-            value: updateInfo.fileSize,
-            inline: true
-          },
-          {
-            name: 'Release Date',
-            value: `<t:${Math.floor(releaseDate)}:F>`,
-            inline: false
-          }
-        ],
-        footer: {
-          text: 'Meta Update Checker'
-        },
-        timestamp: new Date().toISOString()
-      }]
-    };
-
-    const webhookResponse = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(discordPayload)
-    });
-
-    if (!webhookResponse.ok) {
-      throw new Error('Failed to send Discord webhook');
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: updateInfo,
-      message: 'Update checked and Discord notification sent'
-    });
-
-  } catch (error) {
-    console.error('Error:', error);
-    return res.status(500).json({
-      error: error.message || 'Internal server error'
-    });
+    return res.status(200).json({ message: "Done", updates });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: e.message });
   }
 }
